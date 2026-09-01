@@ -1,0 +1,59 @@
+{
+  "name": "whatsapp-auto-promo-bot",
+  "version": "1.0.0",
+  "description": "WhatsApp Auto Promo Bot with Node.js, TypeScript, and Baileys",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "clean": "rimraf dist"
+  },
+  "allowScripts": {
+    "@whiskeysockets/baileys@6.7.24": true,
+    "esbuild@0.28.2": true,
+    "protobufjs@7.6.5": true,
+    "puppeteer@25.8.0": true,
+    "ssh2@1.17.0": true,
+    "ssh@1.8.0": true,
+    "cpu-features@0.0.10": true,
+    "node-pty@1.1.0": true
+  },
+  "keywords": [
+    "whatsapp",
+    "baileys",
+    "bot",
+    "promo",
+    "scheduler",
+    "typescript"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.12",
+    "axios": "^1.19.0",
+    "cheerio": "^1.2.0",
+    "dotenv": "^16.4.7",
+    "https-proxy-agent": "^9.1.0",
+    "node-pty": "^1.1.0",
+    "pino": "^9.6.0",
+    "pino-pretty": "^13.0.0",
+    "puppeteer": "^25.8.0",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-recaptcha": "^3.6.8",
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
+    "qrcode-terminal": "^0.12.0",
+    "qs": "^6.15.3",
+    "ssh": "^1.8.0",
+    "ssh2": "^1.17.0",
+    "uuid": "^14.0.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.4",
+    "@types/qrcode-terminal": "^0.12.2",
+    "rimraf": "^6.0.1",
+    "tsx": "^4.19.3",
+    "typescript": "^5.7.3"
+  }
+}
