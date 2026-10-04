@@ -4,6 +4,13 @@ import { promoService } from '../services/promoService.js';
 import { logService } from '../services/logService.js';
 import { promoScheduler } from '../scheduler/scheduler.js';
 
+type ExtendedMessageKey = proto.IMessageKey & {
+  senderPn?: string | null;
+  participantPn?: string | null;
+  remoteJidAlt?: string | null;
+  participantAlt?: string | null;
+};
+
 export class MessageHandler {
   private normalizeNumber(phone: string): string {
     let cleaned = phone.replace(/\D/g, '');
@@ -21,14 +28,29 @@ export class MessageHandler {
       .filter((num) => num.length > 0);
   }
 
-  public isAdmin(senderJid?: string | null, fromMe?: boolean | null): boolean {
-    // Pesan dari akun bot sendiri otomatis diakui sebagai admin
-    if (fromMe) return true;
-    if (!senderJid) return false;
+  private normalizeJidNumber(jidOrNumber: string): string {
+    const userPart = jidOrNumber.split('@')[0]?.split(':')[0] || '';
+    return this.normalizeNumber(userPart);
+  }
 
-    // Normalisasi sender JID (misal: 6281234567890:1@s.whatsapp.net -> 6281234567890)
-    const phonePart = senderJid.split('@')[0]?.split(':')[0] || '';
-    const normalizedSender = this.normalizeNumber(phonePart);
+  private getSenderCandidates(msg: proto.IWebMessageInfo): string[] {
+    const key = msg.key as ExtendedMessageKey;
+
+    // WhatsApp MD/Baileys dapat memberikan remoteJid berbentuk @lid.
+    // Pada kondisi tersebut nomor asli biasanya tersedia di senderPn/participantPn.
+    return [
+      key.senderPn,
+      key.participantPn,
+      key.remoteJidAlt,
+      key.participantAlt,
+      key.participant,
+      key.remoteJid,
+    ].filter((value): value is string => Boolean(value));
+  }
+
+  public isAdmin(msg: proto.IWebMessageInfo): boolean {
+    // Pesan dari akun bot sendiri otomatis diakui sebagai admin
+    if (msg.key.fromMe) return true;
 
     const adminNumbers = this.getAdminNumbers();
     if (adminNumbers.length === 0) {
@@ -36,7 +58,29 @@ export class MessageHandler {
       return false;
     }
 
-    return adminNumbers.includes(normalizedSender);
+    return this.getSenderCandidates(msg).some((candidate) => {
+      // @lid bukan nomor telepon. Jangan cocokkan angka LID dengan ADMIN_NUMBERS.
+      if (candidate.endsWith('@lid')) return false;
+
+      const normalizedSender = this.normalizeJidNumber(candidate);
+      return normalizedSender.length > 0 && adminNumbers.includes(normalizedSender);
+    });
+  }
+
+  private getReplyJid(msg: proto.IWebMessageInfo, remoteJid: string): string {
+    // Balasan command di grup harus tetap kembali ke grup.
+    if (remoteJid.endsWith('@g.us')) return remoteJid;
+
+    const key = msg.key as ExtendedMessageKey;
+    const phoneJid = [
+      key.senderPn,
+      key.participantPn,
+      key.remoteJidAlt,
+      key.participantAlt,
+      key.remoteJid,
+    ].find((jid) => typeof jid === 'string' && jid.endsWith('@s.whatsapp.net'));
+
+    return phoneJid || remoteJid;
   }
 
   public extractMessageText(msg: proto.IWebMessageInfo): string | null {
@@ -66,9 +110,8 @@ export class MessageHandler {
 
     // Verifikasi otorisasi Admin
     const senderJid = msg.key.participant || msg.key.remoteJid;
-    const fromMe = msg.key.fromMe;
 
-    if (!this.isAdmin(senderJid, fromMe)) {
+    if (!this.isAdmin(msg)) {
       // Abaikan tanpa membalas untuk keamanan
       return;
     }
@@ -193,7 +236,8 @@ export class MessageHandler {
 
     if (replyText) {
       try {
-        await sock.sendMessage(remoteJid, { text: replyText }, { quoted: msg });
+        const replyJid = this.getReplyJid(msg, remoteJid);
+        await sock.sendMessage(replyJid, { text: replyText }, { quoted: msg });
       } catch (err) {
         logService.logError(
           `Gagal membalas pesan command ke ${remoteJid}`,
