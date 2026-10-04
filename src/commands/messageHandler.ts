@@ -67,20 +67,20 @@ export class MessageHandler {
     });
   }
 
-  private getReplyJid(msg: proto.IWebMessageInfo, remoteJid: string): string {
-    // Balasan command di grup harus tetap kembali ke grup.
-    if (remoteJid.endsWith('@g.us')) return remoteJid;
-
+  private getSenderDisplay(msg: proto.IWebMessageInfo): string {
     const key = msg.key as ExtendedMessageKey;
-    const phoneJid = [
-      key.senderPn,
-      key.participantPn,
-      key.remoteJidAlt,
-      key.participantAlt,
-      key.remoteJid,
-    ].find((jid) => typeof jid === 'string' && jid.endsWith('@s.whatsapp.net'));
-
-    return phoneJid || remoteJid;
+    return (
+      [
+        key.senderPn,
+        key.participantPn,
+        key.remoteJidAlt,
+        key.participantAlt,
+        key.participant,
+        key.remoteJid,
+      ].find((jid) => typeof jid === 'string' && !jid.endsWith('@lid')) ||
+      key.remoteJid ||
+      'unknown'
+    );
   }
 
   public extractMessageText(msg: proto.IWebMessageInfo): string | null {
@@ -109,7 +109,7 @@ export class MessageHandler {
     if (!isPrefixed) return;
 
     // Verifikasi otorisasi Admin
-    const senderJid = msg.key.participant || msg.key.remoteJid;
+    const senderJid = this.getSenderDisplay(msg);
 
     if (!this.isAdmin(msg)) {
       // Abaikan tanpa membalas untuk keamanan
@@ -236,8 +236,9 @@ export class MessageHandler {
 
     if (replyText) {
       try {
-        const replyJid = this.getReplyJid(msg, remoteJid);
-        await sock.sendMessage(replyJid, { text: replyText }, { quoted: msg });
+        // Balas ke chat persis tempat command diterima.
+        // Untuk DM modern WhatsApp, remoteJid bisa berupa @lid dan itu memang valid.
+        await sock.sendMessage(remoteJid, { text: replyText }, { quoted: msg });
       } catch (err) {
         logService.logError(
           `Gagal membalas pesan command ke ${remoteJid}`,
